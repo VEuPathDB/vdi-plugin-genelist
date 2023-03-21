@@ -1,6 +1,11 @@
 import sys, re, os, optparse
 
 VALIDATION_ERROR_CODE = 1
+OUTPUT_FILE_NAME = "formatted_gene_list.txt"
+MAX_ALLOWED_GENES = 1000000
+MAX_ID_LENGTH = 80
+VALID_DELIM = r"[\s,;]"
+VALID_GENE_ID = r"[a-zA-Z0-9\(\)\.\:_-]*$"
 
 class ValidationException(BaseException):
     """
@@ -8,13 +13,12 @@ class ValidationException(BaseException):
     """
     pass
 
-
 def execute():
     try:
         inputDir, outputDir = collectAndValidateCliArgs()
         
         origFile = inputDir + "/" + os.listdir(inputDir)[0]
-        formattedFile = outputDir + "/formatted_genelist.txt"
+        formattedFile = outputDir + "/" + OUTPUT_FILE_NAME
 
         create_formatted_genelist_file(origFile, formattedFile)
         validate_genelist(formattedFile)         
@@ -27,14 +31,7 @@ def execute():
 def collectAndValidateCliArgs():
     (options, args) = optparse.OptionParser().parse_args()
     if len(args) < 2:
-        usage = """
-Usage: {} input_dir output_dir
-Prepare and validate a dataset for import.
-input_dir must contain the original dataset files, and no other files.
-output_dir will contain the import-ready set of files.  
-If there is a validation error, exit with status {}.  STDOUT will contain the user-appropriate validation error message""".format(sys.argv[0], VALIDATION_ERROR_CODE)
-        print(usage, file=sys.stderr)
-        exit(-1)
+        usage()
         
     inputDir = args[0]
     outputDir = args[1]
@@ -54,7 +51,6 @@ def create_formatted_genelist_file(origGeneListFile, outputFormattedFile):
         compatibility with dataset lists of genes uploaded as dataset parameters in WDK. The downstream installer
         inserts a gene ID into the database for each line in the file passed to it.
         """
-    valid_sep_exp = r"[\s,;]"
     formatted_file = open(outputFormattedFile, 'w')
     first = True
     genes_set = {"initialize_this_set_with_something"}
@@ -66,22 +62,34 @@ def create_formatted_genelist_file(origGeneListFile, outputFormattedFile):
                 if not first:
                     formatted_file.write("\n")
                 first=False
-                formatted_file.write(re.sub(valid_sep_exp, "\n", gene_id))
+                formatted_file.write(re.sub(VALID_DELIM, "\n", gene_id))
                 genes_set.add(gene_id)
                 genes_count += 1
-                if genes_count > 1000000:
+                if genes_count > MAX_ALLOWED_GENES:
                     raise ValidationException("Invalid number of genes.  Maximum allowed is 1,000,000")
                     
     formatted_file.close()
 
 def validate_genelist(formattedGeneListFile):
-    valid_gene_id_exp = r"[a-zA-Z0-9\(\)\.\:_-]*$"
-    max_length = 80
 
     with open(formattedGeneListFile, 'r') as formatted_file:
         for line in formatted_file:
             gene_id = line.strip()
-            if not re.match(valid_gene_id_exp, gene_id):
+            if not re.match(VALID_GENE_ID, gene_id):
                 raise ValidationException("Invalid character found in Gene identifier " + gene_id + ". Does not conform to pattern" + valid_gene_id_exp)
-            if len(line) > max_length:
-                raise ValidationException("Gene identifier " + line + " exceeds maximum length of " + str(max_length))
+            if len(line) > MAX_ID_LENGTH:
+                raise ValidationException("Gene identifier " + line + " exceeds maximum length of " + str(MAX_ID_LENGTH))
+
+def usage:
+    usage = """
+Usage: {} input_dir output_dir
+
+Prepare and validate a dataset for import.
+
+input_dir: must contain the original dataset files, and no other files.
+output_dir: will contain the import-ready set of files.  
+
+If there is a validation error, exit with status {}.  STDOUT will contain the user-appropriate validation error message""".format(sys.argv[0], VALIDATION_ERROR_CODE)
+    
+    print(usage, file=sys.stderr)
+    exit(-1)

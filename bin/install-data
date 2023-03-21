@@ -2,11 +2,13 @@
 
 use strict;
 
+my $GENES_FILE_NAME = "formatted_gene_list.txt";
+
 my @envVars = ('DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_PLATFORM', 'DB_USER', 'DB_PASS');
 
 my ($userDatasetId, $filesDir) = @ARGV;
 
-usage() unless scalar(@ARGV) == 2;
+usage() unless scalar(@ARGV) == 3;
 
 for my $envVar @envVars { die "Missing env variable '$envVar'\n" unless $ENV{$envVar}; }
 
@@ -20,7 +22,7 @@ my $sth = $dbh->prepare(<<EOF);
     VALUES (?,?)
 EOF
 
-open(F, $geneListFile) || die "Can't open gene list file '$geneListFile'\n";
+open(F, "$filesDir/$GENES_FILE_NAME") || die "Can't open gene list file '$filesDir/$GENES_FILE_NAME'\n";
 my $count = 0;
 while(<F>) {
   chomp;
@@ -37,11 +39,12 @@ sub usage {
   die "
 Install a Gene List user dataset in the user dataset schema.
 
-Usage: install-data user_dataset_id files_dir
+Usage: install-data user_dataset_id files_dir meta.json
 
 Where:
   user_dataset_id:  a user dataset id
   files_dir:        a directory containing exactly one file.  This file is the gene_list_file, a txt file with one column per line containing a gene source id
+  meta.json:        a file containing VDI meta info.  Not used for gene lists
 
 Env: \$$envStr
 

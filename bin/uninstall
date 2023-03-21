@@ -4,9 +4,9 @@ use strict;
 
 my @envVars = ('DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_PLATFORM', 'DB_USER', 'DB_PASS');
 
-my ($userDatasetId, $filesDir) = @ARGV;
+my ($userDatasetId) = @ARGV;
 
-usage() unless scalar(@ARGV) == 2;
+usage() unless scalar(@ARGV) == 1;
 
 for my $envVar @envVars { die "Missing env variable '$envVar'\n" unless $ENV{$envVar}; }
 
@@ -30,7 +30,7 @@ sub usage {
   die "
 Uninstall a Gene List user dataset from the user dataset schema.
 
-Usage: install-data user_dataset_id 
+Usage: uninstall user_dataset_id 
 
 Where:
   user_dataset_id:  a user dataset id
