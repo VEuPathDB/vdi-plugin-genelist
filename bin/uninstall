@@ -8,9 +8,9 @@ my ($userDatasetId) = @ARGV;
 
 usage() unless scalar(@ARGV) == 1;
 
-for my $envVar @envVars { die "Missing env variable '$envVar'\n" unless $ENV{$envVar}; }
+for my $envVar (@envVars) { die "Missing env variable '$envVar'\n" unless $ENV{$envVar}; }
 
-my $dbh = DBI->connect("dbi:$ENV{DB_PLATFORM'}:database=$ENV{DB_NAME};host=$ENV{DB_HOST};port=$ENV{DB_PORT}", $ENV{DB_USER}, $ENV{DB_PASS})
+my $dbh = DBI->connect("dbi:$ENV{DB_PLATFORM}:database=$ENV{DB_NAME};host=$ENV{DB_HOST};port=$ENV{DB_PORT}", $ENV{DB_USER}, $ENV{DB_PASS})
     || die "Couldn't connect to database: " . DBI->errstr;
 
 $dbh->{RaiseError} = 1;
