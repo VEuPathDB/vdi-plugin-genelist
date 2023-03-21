@@ -1,27 +1,18 @@
 #!/usr/bin/perl
 
 use strict;
-use lib "$ENV{GUS_HOME}/lib/perl";
 
-use GUS::Supported::GusConfig;
-use GUS::ObjRelP::DbiDatabase;
+my @envVars = ('DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_PLATFORM', 'DB_USER', 'DB_PASS');
 
-use File::Find;
-use File::Basename;
+my ($userDatasetId, $filesDir) = @ARGV;
 
-my ($userDatasetId, $geneListFile, $projectId) = @ARGV;
+usage() unless scalar(@ARGV) == 2;
 
-usage() unless scalar(@ARGV) == 3;
+for my $envVar @envVars { die "Missing env variable '$envVar'\n" unless $ENV{$envVar}; }
 
-my $gusconfig = GUS::Supported::GusConfig->new("$ENV{GUS_HOME}/config/$projectId/gus.config");
+my $dbh = DBI->connect("dbi:$ENV{DB_PLATFORM'}:database=$ENV{DB_NAME};host=$ENV{DB_HOST};port=$ENV{DB_PORT}", $ENV{DB_USER}, $ENV{DB_PASS})
+    || die "Couldn't connect to database: " . DBI->errstr;
 
-my $db = GUS::ObjRelP::DbiDatabase->new($gusconfig->getDbiDsn(),
-                                        $gusconfig->getDatabaseLogin(),
-                                        $gusconfig->getDatabasePassword(),
-                                        0,0,1,
-                                        $gusconfig->getCoreSchemaName());
-
-my $dbh = $db->getQueryHandle(0);
 $dbh->{RaiseError} = 1;
 
 my $sth = $dbh->prepare(<<EOF);
@@ -40,13 +31,19 @@ while(<F>) {
 $dbh->commit;
 
 sub usage {
+
+  my $envStr = join(", \$", @envVars);
+
   die "
 Install a Gene List user dataset in the user dataset schema.
-Usage installGeneListUserDataset user_dataset_id gene_list_file project_id
+
+Usage: install-data user_dataset_id files_dir
+
 Where:
   user_dataset_id:  a user dataset id
-  gene_list_file:   a txt file with one column per line, a gene source id
-  project_id:       PlasmoDB, etc.
-Finds gus.config in \$GUS_HOME/config/project_id/gus.config
+  files_dir:        a directory containing exactly one file.  This file is the gene_list_file, a txt file with one column per line containing a gene source id
+
+Env: \$$envStr
+
 ";
 }

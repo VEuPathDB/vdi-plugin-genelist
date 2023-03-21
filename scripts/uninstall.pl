@@ -1,24 +1,19 @@
 #!/usr/bin/perl
 
 use strict;
-use warnings;
-use lib "$ENV{GUS_HOME}/lib/perl";
 
-use GUS::Supported::GusConfig;
-use GUS::ObjRelP::DbiDatabase;
+my @envVars = ('DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_PLATFORM', 'DB_USER', 'DB_PASS');
 
-my ($userDatasetId, $projectId) = @ARGV;
+my ($userDatasetId, $filesDir) = @ARGV;
 
-usage() unless $userDatasetId && $projectId;
+usage() unless scalar(@ARGV) == 2;
 
-my $gusconfig = GUS::Supported::GusConfig->new("$ENV{GUS_HOME}/config/$projectId/gus.config");
+for my $envVar @envVars { die "Missing env variable '$envVar'\n" unless $ENV{$envVar}; }
 
-my $db = GUS::ObjRelP::DbiDatabase->new($gusconfig->getDbiDsn(),
-                                        $gusconfig->getDatabaseLogin(),
-                                        $gusconfig->getDatabasePassword(),
-                                        0,0,1,
-                                        $gusconfig->getCoreSchemaName());
-my $dbh = $db->getQueryHandle(0);
+my $dbh = DBI->connect("dbi:$ENV{DB_PLATFORM'}:database=$ENV{DB_NAME};host=$ENV{DB_HOST};port=$ENV{DB_PORT}", $ENV{DB_USER}, $ENV{DB_PASS})
+    || die "Couldn't connect to database: " . DBI->errstr;
+
+$dbh->{RaiseError} = 1;
 
 my $sth = $dbh->prepare(<<EOF);
     DELETE from ApiDBUserDatasets.UD_GeneId
@@ -29,12 +24,18 @@ $sth->execute($userDatasetId);
 $dbh->commit;
 
 sub usage {
+
+  my $envStr = join(", \$", @envVars);
+
   die "
-Uninstall a Gene List user dataset from the user datasets schema.
-Usage:  uninstallGeneListUserDataset user_dataset_id project_id
+Uninstall a Gene List user dataset from the user dataset schema.
+
+Usage: install-data user_dataset_id 
+
 Where:
   user_dataset_id:  a user dataset id
-  project_id:       PlasmoDB, etc.
-Finds gus.config in \$GUS_HOME/config/project_id/gus.config
+
+Env: \$$envStr
+
 ";
 }
