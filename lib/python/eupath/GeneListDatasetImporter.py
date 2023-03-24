@@ -80,7 +80,7 @@ def validate_genelist(formattedGeneListFile):
             if len(line) > MAX_ID_LENGTH:
                 raise ValidationException("Gene identifier " + line + " exceeds maximum length of " + str(MAX_ID_LENGTH))
 
-def usage:
+def usage():
     usage = """
 Usage: {} input_dir output_dir
 

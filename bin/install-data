@@ -1,6 +1,7 @@
 #!/usr/bin/perl
 
 use strict;
+use DBI;
 
 my $GENES_FILE_NAME = "formatted_gene_list.txt";
 
