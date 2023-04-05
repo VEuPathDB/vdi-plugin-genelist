@@ -84,10 +84,10 @@ def usage():
     usage = """
 Usage: {} input_dir output_dir
 
-Prepare and validate a dataset for import.
+Prepare and validate a gene list dataset for import.
 
-input_dir: must contain the original dataset files, and no other files.
-output_dir: will contain the import-ready set of files.  
+input_dir: must contain the original dataset files, and no other files. In this case, exactly one file, a gene list.
+output_dir: will contain the import-ready set of files.  In this case, a file with name 'formatted_gene_list.txt'
 
 If there is a validation error, exit with status {}.  STDOUT will contain the user-appropriate validation error message""".format(sys.argv[0], VALIDATION_ERROR_CODE)
     
