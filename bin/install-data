@@ -7,9 +7,9 @@ my $GENES_FILE_NAME = "formatted_gene_list.txt";
 
 my @envVars = ('DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_PLATFORM', 'DB_USER', 'DB_PASS');
 
-my ($userDatasetId, $filesDir, $metajsonFile) = @ARGV;
+my ($userDatasetId, $filesDir) = @ARGV;
 
-usage() unless scalar(@ARGV) == 3;
+usage() unless scalar(@ARGV) == 2;
 
 for my $envVar (@envVars) { die "Missing env variable '$envVar'\n" unless $ENV{$envVar}; }
 
@@ -40,12 +40,11 @@ sub usage {
   die "
 Install a Gene List user dataset in the user dataset schema.
 
-Usage: install-data user_dataset_id files_dir metajsonFile
+Usage: install-data user_dataset_id files_dir
 
 Where:
   user_dataset_id:  a user dataset id
   files_dir:        a directory containing exactly one file.  This file is the gene_list_file, a txt file with one column per line containing a gene source id
-  metajsonFile:        a file containing VDI meta info.  Not used for gene lists
 
 Env: \$$envStr
 
