@@ -1,6 +1,3 @@
-IMAGE_NAME := $(shell cat Jenkinsfile | grep '\[ name: ' | sed "s/.\+'\(.\+\)'.\+/\1/")
-
-
 default:
 	@echo "Usage:"
 	@echo "  make build"
