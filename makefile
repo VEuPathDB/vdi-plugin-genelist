@@ -1,3 +1,5 @@
+IMAGE_NAME := $(shell grep 'name:' Jenkinsfile | sed "s/.\+'\(.\+\)'.\+/\1/g")
+
 default:
 	@echo "Usage:"
 	@echo "  make build"
@@ -26,4 +28,7 @@ stop:
 	@docker compose down -v
 
 shell:
-	@docker exec -it vdi-plugin-genelist-plugin-1 bash
+	@docker exec -it $(IMAGE_NAME)-plugin-1 bash
+
+logs:
+	@docker logs -f $(IMAGE_NAME)-plugin-1
