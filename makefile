@@ -5,22 +5,28 @@ default:
 	@echo "Usage:"
 	@echo "  make build"
 	@echo
-	@echo "    Builds the docker image \"$(IMAGE_NAME):latest\" for local use."
+	@echo "    Builds the docker image for local use."
 	@echo
-	@echo "  make run"
+	@echo "  make start"
 	@echo
-	@echo "    Runs an already build docker image ($(IMAGE_NAME):latest)."
+	@echo "    Starts the project's docker image as a background container."
+	@echo
+	@echo "  make stop"
+	@echo
+	@echo "    Shuts down a running background container for this project."
 	@echo
 	@echo "  make shell"
 	@echo
-	@echo "    Opens a bash session in a container built from $(IMAGE_NAME):latest."
-
+	@echo "    Opens a bash session in a running instance of this project's docker image."
 
 build:
-	@docker build -t veupathdb/$(IMAGE_NAME):latest .
+	@docker compose build
 
-run:
-	@docker run -it --rm --env-file=.env -p 8080:8080 veupathdb/$(IMAGE_NAME):latest
+start:
+	@docker compose up -d
+
+stop:
+	@docker compose down -v
 
 shell:
-	@docker run -it --rm --env-file=.env -p 8080:8080 veupathdb/$(IMAGE_NAME):latest bash
+	@docker exec -it vdi-plugin-genelist-plugin-1 bash

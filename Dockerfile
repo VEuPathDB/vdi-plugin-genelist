@@ -1,7 +1,4 @@
-FROM veupathdb/vdi-plugin-handler-base:latest
-
-RUN apk add --no-cache bash; \
-  mkdir "/opt/veupathdb"
+FROM veupathdb/vdi-plugin-base:latest
 
 COPY bin/ /opt/veupathdb/bin
 COPY lib/ /opt/veupathdb/lib
