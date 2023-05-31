@@ -17,6 +17,10 @@ default:
 	@echo "  make shell"
 	@echo
 	@echo "    Opens a bash session in a running instance of this project's docker image."
+	@echo
+	@echo "  make logs"
+	@echo
+	@echo "    Attaches to the log output of a running instance of this project's docker image."
 
 build:
 	@docker compose build
