@@ -5,7 +5,7 @@ use DBI;
 
 my $GENES_FILE_NAME = "formatted_gene_list.txt";
 
-my @envVars = ('DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_PLATFORM', 'DB_USER', 'DB_PASS');
+my @envVars = ('DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_PLATFORM', 'DB_USER', 'DB_PASS', 'DB_SCHEMA');
 
 my ($userDatasetId, $filesDir) = @ARGV;
 
@@ -17,8 +17,10 @@ my $dbh = DBI->connect("dbi:$ENV{DB_PLATFORM}://$ENV{DB_HOST}:$ENV{DB_PORT}/$ENV
 
 $dbh->{RaiseError} = 1;
 
+my $dbSchema = $ENV{DB_SCHEMA};
+
 my $sth = $dbh->prepare(<<EOF);
-    INSERT INTO ApiDBUserDatasets.UD_GeneId
+    INSERT INTO $dbSchema.UD_GeneId
     VALUES (?,?)
 EOF
 
