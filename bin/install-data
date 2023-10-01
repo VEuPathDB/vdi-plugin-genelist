@@ -16,6 +16,7 @@ my $dbh = DBI->connect("dbi:$ENV{DB_PLATFORM}://$ENV{DB_HOST}:$ENV{DB_PORT}/$ENV
     || die "Couldn't connect to database: " . DBI->errstr;
 
 $dbh->{RaiseError} = 1;
+$dbh->{AutoCommit} = 0;
 
 my $dbSchema = $ENV{DB_SCHEMA};
 
