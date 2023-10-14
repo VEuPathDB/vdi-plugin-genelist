@@ -1,7 +1,9 @@
 #!/usr/bin/perl
-
-use strict;
 use DBI;
+use Time::HiRes qw ( time );
+use FindBin;
+use lib "$FindBin::Bin/../lib/perl";
+use DbiBatchExecutor;
 
 my $GENES_FILE_NAME = "formatted_gene_list.txt";
 
@@ -11,9 +13,12 @@ my ($userDatasetId, $filesDir) = @ARGV;
 
 usage() unless scalar(@ARGV) == 2;
 
+my $t = time();
 for my $envVar (@envVars) { die "Missing env variable '$envVar'\n" unless $ENV{$envVar}; }
 my $dbh = DBI->connect("dbi:$ENV{DB_PLATFORM}://$ENV{DB_HOST}:$ENV{DB_PORT}/$ENV{DB_NAME}", $ENV{DB_USER}, $ENV{DB_PASS})
     || die "Couldn't connect to database: " . DBI->errstr;
+
+print STDERR "connect time: " . (time() - $t) . "\n";
 
 $dbh->{RaiseError} = 1;
 $dbh->{AutoCommit} = 0;
@@ -26,14 +31,44 @@ my $sth = $dbh->prepare(<<EOF);
 EOF
 
 open(F, "<$filesDir/$GENES_FILE_NAME") || die "Can't open gene list file '$filesDir/$GENES_FILE_NAME' $!\n";
-my $count = 0;
+my @udIdArray;
+my @geneIdArray;
+my $batchExecutor = new DbiBatchExecutor(100, 1000);
 while(<F>) {
   chomp;
-  $sth->execute($userDatasetId, $_);
-   $dbh->commit if ($count++ % 1000 == 0);
+  push(@udIdArray, $userDatasetId);
+  push(@geneIdArray, $_);
+  $batchExecutor->periodicallyExecuteBatch($dbh, $sth, 0, \@udIdArray, \@geneIdArray);
 }
+$batchExecutor->periodicallyExecuteBatch($dbh, $sth, 1, \@udIdArray, \@geneIdArray);
 
-$dbh->commit;
+$dbh->disconnect();
+
+print STDERR "total time: " . (time() - $t) . "\n";
+
+##########################################
+#  the code below can go into a library
+##########################################
+
+sub insertTupleArray {
+  my ($sth, $finalBatch, @arrayRefs) = @_;
+
+  $batchCount++;
+  $commitCount++;
+  $batchNum++;
+  if ($batchCount == $BATCH_SIZE || $finalBatch) {
+    my $insertCount = $sth->execute_array({ ArrayTupleStatus => \my @tuple_status }, @arrayRefs);
+    die "Failed inserting batch number $batchNum\n" unless $insertCount;
+    $batchCount = 0;
+    for my $arrayRef (@arrayRefs) {
+      @$arrayRef = ();
+    }
+  }
+  if ($commitCount == $COMMIT_SIZE || $finalBatch) {
+    $dbh->commit();
+    $commitCount = 0;
+  }
+}
 
 sub usage {
 
@@ -48,7 +83,7 @@ Where:
   user_dataset_id:  a user dataset id
   files_dir:        a directory containing exactly one file.  This file is the gene_list_file, a txt file with one column per line containing a gene source id
 
-Env: \$$envStr
+Env: $envStr
 
 ";
 }
