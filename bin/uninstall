@@ -3,7 +3,7 @@
 use strict;
 use DBI;
 
-my @envVars = ('DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_PLATFORM', 'DB_USER', 'DB_PASS');
+my @envVars = ('DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_PLATFORM', 'DB_USER', 'DB_PASS', 'DB_SCHEMA');
 
 my ($userDatasetId) = @ARGV;
 
@@ -11,13 +11,15 @@ usage() unless scalar(@ARGV) == 1;
 
 for my $envVar (@envVars) { die "Missing env variable '$envVar'\n" unless $ENV{$envVar}; }
 
+my $dbSchema = $ENV{DB_SCHEMA};
+
 my $dbh = DBI->connect("dbi:$ENV{DB_PLATFORM}://$ENV{DB_HOST}:$ENV{DB_PORT}/$ENV{DB_NAME}", $ENV{DB_USER}, $ENV{DB_PASS})
     || die "Couldn't connect to database: " . DBI->errstr;
 
 $dbh->{RaiseError} = 1;
 
 my $sth = $dbh->prepare(<<EOF);
-    DELETE from ApiDBUserDatasets.UD_GeneId
+    DELETE from $dbSchema.UD_GeneId
     WHERE user_dataset_id = ?
 EOF
 $sth->execute($userDatasetId);
@@ -26,7 +28,7 @@ $dbh->commit;
 
 sub usage {
 
-  my $envStr = join(", \$", @envVars);
+  my $envStr = '$' . join(", \$", @envVars);
 
   die "
 Uninstall a Gene List user dataset from the user dataset schema.
@@ -36,7 +38,7 @@ Usage: uninstall user_dataset_id
 Where:
   user_dataset_id:  a user dataset id
 
-Env: \$$envStr
+Env: $envStr
 
 ";
 }

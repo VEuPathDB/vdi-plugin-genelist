@@ -49,7 +49,7 @@ print STDERR "total time: " . (time() - $t) . "\n";
 
 sub usage {
 
-  my $envStr = join(", \$", @envVars);
+  my $envStr = '$' . join(", \$", @envVars);
 
   die "
 Install a Gene List user dataset in the user dataset schema.
