@@ -68,6 +68,8 @@ def create_formatted_genelist_file(origGeneListFile, outputFormattedFile):
                 if genes_count > MAX_ALLOWED_GENES:
                     raise ValidationException("Invalid number of genes.  Maximum allowed is 1,000,000")
                     
+    if genes_count == 0:
+        raise ValidationException("No genes found.  Empty file.")
     formatted_file.close()
 
 def validate_genelist(formattedGeneListFile):
