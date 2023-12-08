@@ -77,10 +77,12 @@ def validate_genelist(formattedGeneListFile):
     with open(formattedGeneListFile, 'r') as formatted_file:
         for line in formatted_file:
             gene_id = line.strip()
+            if len(gene_id) == 0:
+                continue  
             if not re.match(VALID_GENE_ID, gene_id):
-                raise ValidationException("Invalid character found in Gene identifier " + gene_id + ". Does not conform to pattern: " + VALID_GENE_ID)
-            if len(line) > MAX_ID_LENGTH:
-                raise ValidationException("Gene identifier " + line + " exceeds maximum length of " + str(MAX_ID_LENGTH))
+                raise ValidationException("Invalid character found in Gene identifier: " + gene_id + ". Does not conform to pattern: " + VALID_GENE_ID)
+            if len(gene_id) > MAX_ID_LENGTH:
+                raise ValidationException("Gene identifier: " + gene_id + " exceeds maximum length of " + str(MAX_ID_LENGTH))
 
 def usage():
     usage = """
