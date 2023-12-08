@@ -81,6 +81,8 @@ def validate_genelist(formattedGeneListFile):
                 continue  
             if not re.match(VALID_GENE_ID, gene_id):
                 raise ValidationException("Invalid character found in Gene identifier: " + gene_id + ". Does not conform to pattern: " + VALID_GENE_ID)
+            if not re.search(r[a-zA-z], gene_id):
+                raise ValidationException("Invalid Gene ID: " + gene_id + ". Must contain at least one letter." + VALID_GENE_ID)
             if len(gene_id) > MAX_ID_LENGTH:
                 raise ValidationException("Gene identifier: " + gene_id + " exceeds maximum length of " + str(MAX_ID_LENGTH))
 
