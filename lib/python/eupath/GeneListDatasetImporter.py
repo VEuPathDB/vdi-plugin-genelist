@@ -1,6 +1,6 @@
 import sys, re, os, optparse
 
-VALIDATION_ERROR_CODE = 1
+VALIDATION_ERROR_CODE = 99
 OUTPUT_FILE_NAME = "formatted_gene_list.txt"
 MAX_ALLOWED_GENES = 1000000
 MAX_ID_LENGTH = 80
