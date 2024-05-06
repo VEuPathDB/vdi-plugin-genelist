@@ -16,23 +16,23 @@ class ValidationException(BaseException):
 def execute():
     try:
         inputDir, outputDir = collectAndValidateCliArgs()
-        
+
         origFile = inputDir + "/" + os.listdir(inputDir)[0]
         formattedFile = outputDir + "/" + OUTPUT_FILE_NAME
 
         create_formatted_genelist_file(origFile, formattedFile)
-        validate_genelist(formattedFile)         
+        validate_genelist(formattedFile)
 
     except ValidationException as e:
         print(e, file=sys.stdout) # validation error must go to STDOUT, to ship to user
         sys.exit(VALIDATION_ERROR_CODE)
-          
-        
+
+
 def collectAndValidateCliArgs():
     (options, args) = optparse.OptionParser().parse_args()
     if len(args) < 2:
         usage()
-        
+
     inputDir = args[0]
     outputDir = args[1]
 
@@ -44,7 +44,7 @@ def collectAndValidateCliArgs():
 
     return inputDir, outputDir
 
-        
+
 def create_formatted_genelist_file(origGeneListFile, outputFormattedFile):
     """
         Formats the input gene list file, transforming all commas, spaces and tabs to new lines. This enables
@@ -64,7 +64,7 @@ def create_formatted_genelist_file(origGeneListFile, outputFormattedFile):
                     genes_count += 1
                     if genes_count > MAX_ALLOWED_GENES:
                         raise ValidationException("Invalid number of genes.  Maximum allowed is 1,000,000")
-                    
+
     if genes_count == 0:
         raise ValidationException("No genes found.  Empty file.")
     formatted_file.close()
@@ -94,6 +94,6 @@ input_dir: must contain the original dataset files, and no other files. In this 
 output_dir: will contain the import-ready set of files.  In this case, a file with name 'formatted_gene_list.txt'
 
 If there is a validation error, exit with status {}.  STDOUT will contain the user-appropriate validation error message""".format(sys.argv[0], VALIDATION_ERROR_CODE)
-    
+
     print(usage, file=sys.stderr)
     exit(-1)
