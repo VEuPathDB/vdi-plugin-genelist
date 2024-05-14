@@ -55,15 +55,18 @@ def create_formatted_genelist_file(origGeneListFile, outputFormattedFile):
     genes_set = {"initialize_this_set_with_something"}
     genes_count = 0
     with open(origGeneListFile, 'r') as source_file:
-        for line in source_file:
-            gene_ids = re.split(VALID_DELIM, line.strip());
-            for gene_id in gene_ids:
-                if gene_id != "" and re.match(VALID_GENE_ID, gene_id) and re.search(r"[a-zA-z]", gene_id) and gene_id not in genes_set:
-                    formatted_file.write(gene_id + "\n")
-                    genes_set.add(gene_id)
-                    genes_count += 1
-                    if genes_count > MAX_ALLOWED_GENES:
-                        raise ValidationException("Invalid number of genes.  Maximum allowed is 1,000,000")
+        try:
+            for line in source_file:
+                gene_ids = re.split(VALID_DELIM, line.strip());
+                for gene_id in gene_ids:
+                    if gene_id != "" and re.match(VALID_GENE_ID, gene_id) and re.search(r"[a-zA-z]", gene_id) and gene_id not in genes_set:
+                        formatted_file.write(gene_id + "\n")
+                        genes_set.add(gene_id)
+                        genes_count += 1
+                        if genes_count > MAX_ALLOWED_GENES:
+                            raise ValidationException("Invalid number of genes.  Maximum allowed is 1,000,000")
+        except UnicodeDecodeError:
+            raise ValidationException("Input file was not a valid UTF-8 encoded text file.")
 
     if genes_count == 0:
         raise ValidationException("No genes found.  Empty file.")
