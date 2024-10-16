@@ -47,10 +47,11 @@ def collectAndValidateCliArgs():
 
 def create_formatted_genelist_file(origGeneListFile, outputFormattedFile):
     """
-        Formats the input gene list file, transforming all commas, spaces and tabs to new lines. This enables
-        compatibility with dataset lists of genes uploaded as dataset parameters in WDK. The downstream installer
-        inserts a gene ID into the database for each line in the file passed to it.
-        """
+    Formats the input gene list file, transforming all commas, spaces and tabs
+    to new lines. This enables compatibility with dataset lists of genes
+    uploaded as dataset parameters in WDK. The downstream installer inserts a
+    gene ID into the database for each line in the file passed to it.
+    """
     formatted_file = open(outputFormattedFile, 'w')
     genes_set = {"initialize_this_set_with_something"}
     genes_count = 0
