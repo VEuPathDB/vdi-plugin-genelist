@@ -1,12 +1,5 @@
-= VDI Handler Plugin Template
+= VDI Genelist Plugin
 
-This repository is a template repo for creating new VDI handler plugins.
-
-== Usage
-
-To use this repository, click the green "Use this template" button near the top
-right of the repository source file listing table and create a new repository
-for your handler.
-
-This repository follows the normal steps as outlined in the VEuPathDB Confluence
-doc titled "Deploy Containerized Services for Local Development".
+.*Uses*
+* https://github.com/VEuPathDB/lib-perl-dbi-utils[lib-perl-dbi-utils]
+* Oracle Instant Client
