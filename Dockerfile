@@ -7,7 +7,7 @@ ENV ORACLE_HOME=/opt/oracle \
 
 # PACKAGED DEPENDENCIES
 RUN apt-get update \
-  && apt-get install -y libaio1t64 libdbi-perl unzip python3 make gcc \
+  && apt-get install -y libaio1t64 libdbi-perl unzip python3 make gcc libtest-nowarnings-perl \
   && apt-get clean \
   && ln -s /usr/lib/x86_64-linux-gnu/libaio.so.1t64 /usr/lib/x86_64-linux-gnu/libaio.so.1
 
