@@ -1,4 +1,4 @@
-FROM veupathdb/vdi-plugin-base:
+FROM veupathdb/vdi-plugin-base:8.1.0-rc7
 
 ARG LIB_DBI_UTILS_VERSION=1.0.0
 
