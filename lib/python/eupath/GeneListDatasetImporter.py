@@ -36,8 +36,15 @@ def collectAndValidateCliArgs():
     inputDir = args[0]
     outputDir = args[1]
 
-    if not (os.path.isdir(inputDir) and len(os.listdir(inputDir)) == 1):
-        raise Exception("input_dir must exist and contain exactly one file.")
+    if not os.path.isdir(inputDir):
+        raise Exception("input_dir must exist")
+
+    # Remove meta.json, we don't need it.
+    if os.path.exists(os.path.join(inputDir, "vdi-meta.json")):
+        os.remove(os.path.join(inputDir, "vdi-meta.json"))
+
+    if len(os.listdir(inputDir)) != 1:
+        raise Exception("input_dir must contain exactly one file.")
 
     if not (os.path.isdir(outputDir) and len(os.listdir(outputDir)) == 0):
         raise Exception("output_dir must exist and be empty.")
