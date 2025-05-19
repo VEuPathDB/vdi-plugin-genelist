@@ -51,7 +51,7 @@ COPY lib/ /opt/veupathdb/lib
 RUN chmod +x /opt/veupathdb/bin/*
 
 # VDI PLUGIN SERVER
-ARG PLUGIN_SERVER_VERSION=v8.2.0-beta.1
+ARG PLUGIN_SERVER_VERSION=v8.2.0-beta.4
 RUN set -o pipefail \
     && curl "https://github.com/VEuPathDB/vdi-plugin-handler-server/releases/download/${PLUGIN_SERVER_VERSION}/docker-download.sh" -Lf --no-progress-meter | bash
 
