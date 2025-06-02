@@ -7,11 +7,11 @@ ENV LANG=en_US.UTF-8 \
   PATH=/opt/veupathdb/bin:$PATH
 
 RUN apt-get update \
-  && apt-get install -y locales \
+  && apt-get install -y locales python3 curl wget git \
   && sed -i -e "s/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/" /etc/locale.gen \
   && dpkg-reconfigure --frontend=noninteractive locales \
   && update-locale LANG=en_US.UTF-8 \
-  && apt-get install -y tzdata curl wget git perl libaio1t64 libdbi-perl unzip libtest-nowarnings-perl make gcc \
+  && apt-get install -y tzdata perl libaio1t64 libdbi-perl unzip libtest-nowarnings-perl make gcc \
   && cp /usr/share/zoneinfo/America/New_York /etc/localtime \
   && echo ${TZ} > /etc/timezone \
   && apt-get clean \
