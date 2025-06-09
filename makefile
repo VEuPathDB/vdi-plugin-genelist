@@ -23,7 +23,7 @@ default:
 	@echo "    Attaches to the log output of a running instance of this project's docker image."
 
 build:
-	@docker build -t veupathdb/vdi-plugin-genelist --no-cache .
+	@docker build -t veupathdb/vdi-plugin-genelist .
 
 start:
 	@docker compose up -d
