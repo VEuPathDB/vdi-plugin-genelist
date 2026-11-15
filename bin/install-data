@@ -5,10 +5,18 @@ use Time::HiRes qw ( time );
 use FindBin;
 use lib "$FindBin::Bin/../lib/perl";
 use DbiBatchExecutor;
+use VdiPerlUtils;
+use Getopt::Long;
 
 my $GENES_FILE_NAME = "formatted_gene_list.txt";
+my $INPUT_ID_DEBUG_FILE = "debug_input_ids.tsv";
+my $GENE_ID_DEBUG_FILE = "debug_gene_ids.tsv";
+my $LOADED_DEBUG_FILE = "debug_loaded_rows.tsv";
 
-my @envVars = ('DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_PLATFORM', 'DB_USER', 'DB_PASS', 'DB_SCHEMA');
+my @envVars = ('DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER', 'DB_PASS', 'DB_SCHEMA', 'PROJECT_ID');
+
+my $debug;
+GetOptions('debug' => \$debug) || usage();
 
 my ($userDatasetId, $filesDir) = @ARGV;
 
@@ -17,39 +25,250 @@ usage() unless scalar(@ARGV) == 2;
 my $t = time();
 for my $envVar (@envVars) { die "Missing env variable '$envVar'\n" unless $ENV{$envVar}; }
 
-my $connectString = $ENV{DB_PLATFORM} eq 'Oracle'?
-    "dbi:Oracle://$ENV{DB_HOST}:$ENV{DB_PORT}/$ENV{DB_NAME}" :
-    "DBI:Pg:dbname=$ENV{DB_NAME};host=$ENV{DB_HOST};port=$ENV{DB_PORT}";
+my $connectString = "DBI:Pg:dbname=$ENV{DB_NAME};host=$ENV{DB_HOST};port=$ENV{DB_PORT}";
 
 my $dbh = DBI->connect($connectString, $ENV{DB_USER}, $ENV{DB_PASS}) || die "Couldn't connect to database: " . DBI->errstr;
-
-print STDERR "connect time: " . (time() - $t) . "\n";
-
 $dbh->{RaiseError} = 1;
 $dbh->{AutoCommit} = 0;
 
-my $dbSchema = $ENV{DB_SCHEMA};
+my ($allUdIds, $rowsWithExtraCols) = readInputFile("$filesDir/$GENES_FILE_NAME");
 
-my $sth = $dbh->prepare(<<EOF);
-    INSERT INTO $dbSchema.UD_GeneId
-    VALUES (?,?)
-EOF
+# write user's IDs to temp table
+my $tmpTblNm = "UdInputIds_$$";
+writeUdIdsToTempTable($dbh, $allUdIds, $tmpTblNm);
 
-open(F, "<$filesDir/$GENES_FILE_NAME") || die "Can't open gene list file '$filesDir/$GENES_FILE_NAME' $!\n";
-my @udIdArray;
-my @geneIdArray;
-my $batchExecutor = new DbiBatchExecutor(100, 1000);
-while(<F>) {
-  chomp;
-  push(@udIdArray, $userDatasetId);
-  push(@geneIdArray, $_);
-  $batchExecutor->periodicallyExecuteBatch($dbh, $sth, 0, [SQL_VARCHAR, SQL_VARCHAR], \@udIdArray, \@geneIdArray);
-}
-$batchExecutor->periodicallyExecuteBatch($dbh, $sth, 1, [SQL_VARCHAR, SQL_VARCHAR], \@udIdArray, \@geneIdArray);
+my $projectId = $ENV{PROJECT_ID};
+
+# join temp table with the usual suspects to find valid IDs and stats
+my ($validGeneIds, $validUdIdCount, $numberNotFound, $numNonUnique, $numberIdentical, $organisms, $otherProjects, $numberTranscripts) = validateUdIds($projectId, $tmpTblNm);
+
+validationError("No IDs in your dataset mapped to a valid $projectId gene ID") unless scalar(@$validGeneIds);
+
+my $numUnassigned = $numberNotFound + $numNonUnique;
+my $inputCount = $validUdIdCount + $numUnassigned;  # distinct input IDs
+my $totalCount = scalar(@$allUdIds);  # as read from the file, duplicates included
+my $numDuplicates = $totalCount - $inputCount;
+my $loadedCount = scalar(@$validGeneIds);  # distinct genes
+my $numNotIdentical = $validUdIdCount - $numberIdentical - $numberTranscripts;  # transcripts are never identical to their gene ID, but reported separately
+my $otherProjectsString = scalar(@$otherProjects)? " (some mapped to " . join(", ", @$otherProjects) . ")" : '';
+
+my $orgsString = join(', ', @$organisms);
+my $successReport =
+  "$totalCount input IDs were submitted. $numDuplicates were duplicates.
+Of the $inputCount distinct input IDs, $validUdIdCount were uniquely mapped to $loadedCount $projectId gene IDs, which were installed.
+The installed gene IDs are in: $orgsString
+$numUnassigned input IDs were excluded. $numberNotFound did not map to any $projectId gene IDs$otherProjectsString; $numNonUnique mapped to more than one gene ID.
+Of the $validUdIdCount retained input IDs, $numberIdentical are current $projectId gene IDs; $numberTranscripts are current transcript IDs; $numNotIdentical are old IDs, related IDs or gene names.
+";
+
+writeLoadedRowsDebugFile($validGeneIds);  # written even if the load below is skipped
+
+# insert validated and mapped gene IDs into UD_GeneId table
+#loadValidGeneIds($validGeneIds, $ENV{DB_SCHEMA});
 
 $dbh->disconnect();
 
 print STDERR "total time: " . (time() - $t) . "\n";
+
+print STDOUT $successReport;
+
+
+#############################################################################################################
+#################### Subroutines.
+#############################################################################################################
+
+sub readInputFile {
+  my ($filePath) = @_;
+
+  my $allUdIds;
+  my $rowsWithExtraCols = 0;
+
+  open(F, "<$filePath") || die "Can't open gene list file '$filePath' $!\n";
+  while(<F>) {
+    chomp;
+    next unless $_ =~ /\S+/;
+    my @row = split /[\s,;]+/; # delimit on any white space comma or semi.
+    $rowsWithExtraCols += 1 if scalar(@row) > 1;
+    push(@$allUdIds, $row[0]);  # retain duplicates at this stage
+    validationError("Exceeded maximum allowed IDs (1M)") if scalar(@$allUdIds) > 1000000;  # protect memory from abuse. 1M is ~10% of all veupath genes
+  }
+  return ($allUdIds, $rowsWithExtraCols);
+}
+
+sub writeUdIdsToTempTable {
+  my ($dbh, $allUdIds, $tblName) = @_;
+
+  # use postgres's TEMP TABLE feature so no cleanup will be needed
+  $dbh->do("CREATE TEMP TABLE $tblName (input_id TEXT)");
+  my $tmpSth = $dbh->prepare("INSERT INTO $tblName VALUES (?)");
+  my $tmpBatchExecutor = new DbiBatchExecutor(100, 1000);
+  my @tmpIdArray;
+  foreach my $udId (@$allUdIds) {
+    push(@tmpIdArray, $udId);
+    $tmpBatchExecutor->periodicallyExecuteBatch($dbh, $tmpSth, 0, [SQL_VARCHAR], \@tmpIdArray);
+  }
+  $tmpBatchExecutor->periodicallyExecuteBatch($dbh, $tmpSth, 1, [SQL_VARCHAR], \@tmpIdArray);
+}
+
+sub validateUdIds {
+  my ($projectId, $tmpTblNm) = @_;
+
+  # one row per (input ID, organism) with a match in this project.
+  # geneid_p is partitioned by organism, so uniqueness is judged within each organism.
+  my $matchedCtes = "
+inputs as (
+    select distinct input_id from $tmpTblNm
+),
+matched as (
+    select c.input_id,
+           c.org_abbrev,
+           count(distinct c.gene)                              as number_matched,
+           min(c.gene)                                         as gene,
+           min(c.is_identity_mapping)                          as is_identity_mapping,
+           max(c.is_transcript)                                as is_transcript,
+           min(oa.organism_name)                               as organism_name
+    from (
+        -- gene IDs, old IDs, alternate IDs, names
+        select i.input_id, gid.org_abbrev, gid.gene,
+               case when gid.id = gid.gene then 1 else 0 end as is_identity_mapping,  -- the table's id, so input case doesn't matter
+               0 as is_transcript
+        from inputs i
+        join webready.geneid_p gid on lower(gid.id) = lower(i.input_id)
+        where gid.project_id = '$projectId'
+        union all
+        -- transcript IDs are not in geneid_p.  map them to their gene
+        select i.input_id, ta.org_abbrev, ta.gene_source_id,
+               0 as is_identity_mapping,
+               1 as is_transcript
+        from inputs i
+        join apidbtuning.transcriptattributes ta on ta.source_id = i.input_id
+        where ta.project_id = '$projectId'
+    ) c
+    left join apidbtuning.organismattributes oa on oa.internal_abbrev = c.org_abbrev
+    group by c.input_id, c.org_abbrev
+)";
+
+  # per input ID: what happened to it.  one row per distinct input ID
+  my $inputIdSql = "
+with $matchedCtes,
+other as (
+    select i.input_id,
+           string_agg(distinct gid.project_id, ', ' order by gid.project_id) as other_projects
+    from inputs i
+    join webready.geneid_p gid on lower(gid.id) = lower(i.input_id)
+    where gid.project_id <> '$projectId'
+    group by i.input_id
+)
+select i.input_id,
+       count(*) filter (where m.number_matched = 1)                  as num_unique,     -- organisms with a unique mapping
+       count(*) filter (where m.number_matched > 1)                  as num_ambiguous,  -- organisms with more than one gene
+       min(case when m.number_matched = 1 then m.is_identity_mapping end) as is_identity_mapping,  -- 1 only if every unique mapping is identical
+       max(case when m.number_matched = 1 then m.is_transcript end) as is_transcript,
+       min(o.other_projects)                                         as other_projects
+from inputs i
+left join matched m on m.input_id = i.input_id
+left join other o on o.input_id = i.input_id
+group by i.input_id
+";
+
+  # per gene: the distinct genes to load, with their organism
+  my $geneIdSql = "
+with $matchedCtes
+select m.gene as gene_source_id,
+       string_agg(distinct m.input_id, ',' order by m.input_id) as input_ids,  -- the input IDs that mapped to this gene
+       min(m.organism_name) as organism_name
+from matched m
+where m.number_matched = 1
+group by m.gene
+order by m.gene
+";
+
+  # classify each input ID exactly once: mapped, mapped to more than one gene in an organism, or not found.
+  # these three sum to the number of distinct input IDs
+  my ($numberMapped, $numberNotFound, $numberNonUnique, $numberIdentical, $numberTranscripts) = (0, 0, 0, 0, 0);
+  my %otherProjects;
+  my $inputSth = $dbh->prepare($inputIdSql);
+  $inputSth->execute();
+  my $inputDebugFh = openDebugFile($INPUT_ID_DEBUG_FILE, $inputSth);
+  while (my $row = $inputSth->fetchrow_hashref()) {
+    writeDebugRow($inputDebugFh, $inputSth, $row);
+    if ($row->{num_unique} > 0) {
+      $numberMapped++;
+      $numberIdentical += $row->{is_identity_mapping};
+      $numberTranscripts += $row->{is_transcript};
+    } elsif ($row->{num_ambiguous} > 0) {
+      $numberNonUnique++;
+    } else {
+      $numberNotFound++;
+      $otherProjects{$_} = 1 foreach split(/, /, $row->{other_projects} // '');
+    }
+  }
+  $inputSth->finish();
+  close($inputDebugFh) if $inputDebugFh;
+
+  my @validGeneIds;  # distinct genes that input IDs uniquely mapped to
+  my %organisms;
+  my $geneSth = $dbh->prepare($geneIdSql);
+  $geneSth->execute();
+  my $geneDebugFh = openDebugFile($GENE_ID_DEBUG_FILE, $geneSth);
+  while (my $row = $geneSth->fetchrow_hashref()) {
+    writeDebugRow($geneDebugFh, $geneSth, $row);
+    push(@validGeneIds, $row->{gene_source_id});
+    $organisms{$row->{organism_name}} = 1 if defined $row->{organism_name};
+  }
+  $geneSth->finish();
+  close($geneDebugFh) if $geneDebugFh;
+
+  return (\@validGeneIds, $numberMapped, $numberNotFound, $numberNonUnique, $numberIdentical, [sort keys %organisms], [sort keys %otherProjects], $numberTranscripts);
+}
+
+# --debug: write each query's result set, tab delimited with a header row, to a file in the cwd.
+# returns undef (and the write is a no-op) unless --debug was given
+sub openDebugFile {
+  my ($fileName, $sth) = @_;
+  return undef unless $debug;
+
+  open(my $fh, ">", $fileName) || die "Can't open debug file '$fileName' $!\n";
+  print $fh join("\t", @{$sth->{NAME_lc}}) . "\n";
+  print STDERR "debug: writing $fileName\n";
+  return $fh;
+}
+
+sub writeDebugRow {
+  my ($fh, $sth, $row) = @_;
+  return unless $fh;
+
+  print $fh join("\t", map { $_ // '' } @{$row}{@{$sth->{NAME_lc}}}) . "\n";
+}
+
+# --debug: the rows that loadValidGeneIds() inserts into UD_GeneId
+sub writeLoadedRowsDebugFile {
+  my ($validGeneIds) = @_;
+  return unless $debug;
+
+  open(my $fh, ">", $LOADED_DEBUG_FILE) || die "Can't open debug file '$LOADED_DEBUG_FILE' $!\n";
+  print $fh "user_dataset_id\tgene_source_id\n";
+  print $fh "$userDatasetId\t$_\n" foreach @$validGeneIds;
+  close($fh);
+  print STDERR "debug: writing $LOADED_DEBUG_FILE\n";
+}
+
+sub loadValidGeneIds {
+  my ($validGeneIds, $dbSchema) = @_;
+
+  my $sth = $dbh->prepare("INSERT INTO $dbSchema.UD_GeneId (user_dataset_id, gene_source_id) VALUES (?,?)");
+
+  my @udIdArray;
+  my @geneIdArray;
+  my $batchExecutor = new DbiBatchExecutor(100, 1000);
+  foreach my $geneId (@$validGeneIds) {  # distinct, as required by the unique index on (user_dataset_id, gene_source_id)
+    push(@udIdArray, $userDatasetId);
+    push(@geneIdArray, $geneId);
+    $batchExecutor->periodicallyExecuteBatch($dbh, $sth, 0, [SQL_VARCHAR, SQL_VARCHAR], \@udIdArray, \@geneIdArray);
+  }
+  $batchExecutor->periodicallyExecuteBatch($dbh, $sth, 1, [SQL_VARCHAR, SQL_VARCHAR], \@udIdArray, \@geneIdArray);
+  $dbh->commit();  # the executor skips its final commit when the last batch was already flushed
+}
 
 sub usage {
 
@@ -58,11 +277,12 @@ sub usage {
   die "
 Install a Gene List user dataset in the user dataset schema.
 
-Usage: install-data user_dataset_id files_dir
+Usage: install-data user_dataset_id files_dir [--debug] 
 
 Where:
   user_dataset_id:  a user dataset id
   files_dir:        a directory containing exactly one file.  This file is the gene_list_file, a txt file with one column per line containing a gene source id
+  --debug:          optional.  write the result of each query to a tab delimited file in the current directory ($INPUT_ID_DEBUG_FILE, $GENE_ID_DEBUG_FILE, $LOADED_DEBUG_FILE)
 
 Env: $envStr
 
