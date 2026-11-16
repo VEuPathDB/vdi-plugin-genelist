@@ -5,7 +5,7 @@ OUTPUT_FILE_NAME = "formatted_gene_list.txt"
 MAX_ALLOWED_GENES = 1000000
 MAX_ID_LENGTH = 80
 VALID_DELIM = r"[\s,;]+"
-VALID_GENE_ID = r"[a-zA-Z0-9\(\)\.\:_-]*$"
+VALID_GENE_ID = r"[a-zA-Z0-9().:+_-]+"
 
 class ValidationException(BaseException):
     """
