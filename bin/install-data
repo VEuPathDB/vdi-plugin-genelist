@@ -60,11 +60,11 @@ if ($totalCount == $numberIdentical) {  # most common case.  All ids are current
 The gene IDs are in: $orgsString
 ";
 } else {
-  my $dupsString = $numDuplicates? " $numDuplicates were duplicates." : "";
+  my $dupsString = $numDuplicates? " $numDuplicates duplicates were excluded, leaving $inputCount." : "";
   my $excludedString = $numUnassigned? "$numUnassigned input IDs were excluded. $numberNotFound did not map to any $projectId gene IDs$otherProjectsString; $numNonUnique mapped to more than one gene ID.\n" : "";
   $successReport =
   "$totalCount input IDs were submitted.$dupsString
-Of the $inputCount distinct input IDs, $validUdIdCount were uniquely mapped to $loadedCount $projectId gene IDs, which were installed.
+$validUdIdCount were uniquely mapped to $loadedCount $projectId gene IDs, which were installed.
 The installed gene IDs are in: $orgsString
 ${excludedString}Of the $validUdIdCount retained input IDs, $numberIdentical are current $projectId gene IDs; $numberTranscripts are current transcript IDs; $numNotIdentical are old IDs, related IDs or gene names.
 ";
