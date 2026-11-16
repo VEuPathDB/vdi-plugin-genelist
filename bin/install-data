@@ -41,34 +41,10 @@ writeUdIdsToTempTable($dbh, $allUdIds, $tmpTblNm);
 my $projectId = $ENV{PROJECT_ID};
 
 # join temp table with the usual suspects to find valid IDs and stats
-my ($validGeneIds, $validUdIdCount, $numberNotFound, $numNonUnique, $numberIdentical, $organisms, $otherProjects, $numberTranscripts) = validateUdIds($projectId, $tmpTblNm);
+my @validationStats = validateUdIds($projectId, $tmpTblNm);
+my ($validGeneIds, $validUdIdCount, $numberNotFound, $numNonUnique, $numberIdentical, $organisms, $otherProjects, $numberTranscripts) = @validationStats;
 
 validationError("No IDs in your dataset mapped to a valid $projectId gene ID") unless scalar(@$validGeneIds);
-
-my $numUnassigned = $numberNotFound + $numNonUnique;
-my $inputCount = $validUdIdCount + $numUnassigned;  # distinct input IDs
-my $totalCount = scalar(@$allUdIds);  # as read from the file, duplicates included
-my $numDuplicates = $totalCount - $inputCount;
-my $loadedCount = scalar(@$validGeneIds);  # distinct genes
-my $numNotIdentical = $validUdIdCount - $numberIdentical - $numberTranscripts;  # transcripts are never identical to their gene ID, but reported separately
-my $otherProjectsString = scalar(@$otherProjects)? " (some mapped to " . join(", ", @$otherProjects) . ")" : '';
-
-my $successReport;
-my $orgsString = join(', ', @$organisms);
-if ($totalCount == $numberIdentical) {  # most common case.  All ids are current IDs for this project
-  $successReport = "$totalCount input IDs were submitted. All are current $projectId gene IDs, and were installed.
-The gene IDs are in: $orgsString
-";
-} else {
-  my $dupsString = $numDuplicates? " $numDuplicates duplicates were excluded, leaving $inputCount." : "";
-  my $excludedString = $numUnassigned? "$numUnassigned input IDs were excluded. $numberNotFound did not map to any $projectId gene IDs$otherProjectsString; $numNonUnique mapped to more than one gene ID.\n" : "";
-  $successReport =
-  "$totalCount input IDs were submitted.$dupsString
-$validUdIdCount were uniquely mapped to $loadedCount $projectId gene IDs, which were installed.
-The installed gene IDs are in: $orgsString
-${excludedString}Of the $validUdIdCount retained input IDs, $numberIdentical are current $projectId gene IDs; $numberTranscripts are current transcript IDs; $numNotIdentical are old IDs, related IDs or gene names.
-";
-}
 
 writeLoadedRowsDebugFile($validGeneIds);  # written even if the load below is skipped
 
@@ -79,7 +55,7 @@ $dbh->disconnect();
 
 print STDERR "total time: " . (time() - $t) . "\n";
 
-print STDOUT $successReport;
+print STDOUT getSuccessReport(@validationStats);
 
 
 #############################################################################################################
@@ -277,6 +253,39 @@ sub loadValidGeneIds {
   }
   $batchExecutor->periodicallyExecuteBatch($dbh, $sth, 1, [SQL_VARCHAR, SQL_VARCHAR], \@udIdArray, \@geneIdArray);
   $dbh->commit();  # the executor skips its final commit when the last batch was already flushed
+}
+
+sub getSuccessReport {
+  my ($validGeneIds, $validUdIdCount, $numberNotFound, $numNonUnique, $numberIdentical, $organisms, $otherProjects, $numberTranscripts) = @_;
+
+  my $numUnassigned = $numberNotFound + $numNonUnique;
+  my $inputCount = $validUdIdCount + $numUnassigned;  # distinct input IDs
+  my $totalCount = scalar(@$allUdIds);  # as read from the file, duplicates included
+  my $numDuplicates = $totalCount - $inputCount;
+  my $loadedCount = scalar(@$validGeneIds);  # distinct genes
+  my $numNotIdentical = $validUdIdCount - $numberIdentical - $numberTranscripts;  # transcripts are never identical to their gene ID, but reported separately
+  my $otherProjectsString = scalar(@$otherProjects)? " (some mapped to " . join(", ", @$otherProjects) . ")" : '';
+
+  my $successReport;
+  my $orgsString = join(', ', @$organisms);
+  if ($totalCount == $numberIdentical) {  # most common case.  All ids are current IDs for this project
+    $successReport = "$totalCount input IDs were submitted. All are current $projectId gene IDs, and were installed.
+The gene IDs are in: $orgsString
+";
+  } else {
+    my $dupsString = $numDuplicates? " $numDuplicates duplicates were excluded, leaving $inputCount." : "";
+    my $excludedBreakDown = $numNonUnique?
+      "$numberNotFound did not map to any $projectId gene IDs$otherProjectsString; $numNonUnique mapped to more than one gene ID" :
+      "They did not map to any $projectId gene IDs";
+    my $excludedString = $numUnassigned? "$numUnassigned of the unique input IDs were excluded. $excludedBreakDown.\n" : "";
+    $successReport =
+      "$totalCount input IDs were submitted.$dupsString
+$validUdIdCount were uniquely mapped to $loadedCount $projectId gene IDs, which were installed.
+The installed gene IDs are in: $orgsString
+${excludedString}Of the $validUdIdCount retained input IDs, $numberIdentical are current $projectId gene IDs; $numberTranscripts are current transcript IDs; $numNotIdentical are old IDs, related IDs or gene names.
+";
+  }
+  return $successReport;
 }
 
 sub usage {
