@@ -20,6 +20,14 @@ RUN mkdir -p /opt/veupathdb/lib/perl \
   && unzip -qq utils.zip \
   && rm utils.zip
 
+ARG VDI_LIB_PERL_GIT_COMMIT_SHA=9140a27dd476b6caaface44dd4cd797cabcaca93
+RUN git clone https://github.com/VEuPathDB/vdi-lib-perl-utils.git \
+  && cd vdi-lib-perl-utils \
+  && git checkout ${VDI_LIB_PERL_GIT_COMMIT_SHA} \
+  && mkdir -p /opt/veupathdb/lib/perl /opt/veupathdb/bin \
+  && cp lib/perl/*.pm /opt/veupathdb/lib/perl \
+  && rm -rf vdi-lib-perl-utils
+
 COPY bin/ /opt/veupathdb/bin
 COPY lib/ /opt/veupathdb/lib
 
