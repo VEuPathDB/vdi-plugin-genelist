@@ -7,6 +7,7 @@ use lib "$FindBin::Bin/../lib/perl";
 use DbiBatchExecutor;
 use VdiPerlUtils;
 use Getopt::Long;
+use strict;
 
 my $GENES_FILE_NAME = "formatted_gene_list.txt";
 my $INPUT_ID_DEBUG_FILE = "debug_input_ids.tsv";
@@ -52,19 +53,27 @@ my $loadedCount = scalar(@$validGeneIds);  # distinct genes
 my $numNotIdentical = $validUdIdCount - $numberIdentical - $numberTranscripts;  # transcripts are never identical to their gene ID, but reported separately
 my $otherProjectsString = scalar(@$otherProjects)? " (some mapped to " . join(", ", @$otherProjects) . ")" : '';
 
+my $successReport;
 my $orgsString = join(', ', @$organisms);
-my $successReport =
-  "$totalCount input IDs were submitted. $numDuplicates were duplicates.
+if ($totalCount == $numberIdentical) {  # most common case.  All ids are current IDs for this project
+  $successReport = "$totalCount input IDs were submitted. All are current $projectId gene IDs, and were installed.
+The gene IDs are in: $orgsString
+";
+} else {
+  my $dupsString = $numDuplicates? " $numDuplicates were duplicates." : "";
+  my $excludedString = $numUnassigned? "$numUnassigned input IDs were excluded. $numberNotFound did not map to any $projectId gene IDs$otherProjectsString; $numNonUnique mapped to more than one gene ID.\n" : "";
+  $successReport =
+  "$totalCount input IDs were submitted.$dupsString
 Of the $inputCount distinct input IDs, $validUdIdCount were uniquely mapped to $loadedCount $projectId gene IDs, which were installed.
 The installed gene IDs are in: $orgsString
-$numUnassigned input IDs were excluded. $numberNotFound did not map to any $projectId gene IDs$otherProjectsString; $numNonUnique mapped to more than one gene ID.
-Of the $validUdIdCount retained input IDs, $numberIdentical are current $projectId gene IDs; $numberTranscripts are current transcript IDs; $numNotIdentical are old IDs, related IDs or gene names.
+${excludedString}Of the $validUdIdCount retained input IDs, $numberIdentical are current $projectId gene IDs; $numberTranscripts are current transcript IDs; $numNotIdentical are old IDs, related IDs or gene names.
 ";
+}
 
 writeLoadedRowsDebugFile($validGeneIds);  # written even if the load below is skipped
 
 # insert validated and mapped gene IDs into UD_GeneId table
-#loadValidGeneIds($validGeneIds, $ENV{DB_SCHEMA});
+loadValidGeneIds($validGeneIds, $ENV{DB_SCHEMA});
 
 $dbh->disconnect();
 
